@@ -6,7 +6,7 @@ def build_testcase(number_of_value,d_norm,lenght_of_value):
 
     with open(os.path.join(os.path.dirname(__file__),"dataset/mathAIH02.txt"), 'w') as f:
         f.write(f'd_norm in norm is: {d_norm}\n')
-
+ 
     tmp = [None] * number_of_value
     for i in range(number_of_value):
         tmp[i] = randint(1, lenght_of_value)-lenght_of_value/2
@@ -15,12 +15,16 @@ def build_testcase(number_of_value,d_norm,lenght_of_value):
     with open(os.path.join(os.path.dirname(__file__),"dataset/mathAIH02.txt"), 'a') as f:
         f.write(f'Values are: {tmp}\n')
 
+    weighting, biasing = randint(-lenght_of_value, lenght_of_value), randint(-lenght_of_value, lenght_of_value)
     for i in range(number_of_value):
-        tmp[i] += randint(1, lenght_of_value/5)-lenght_of_value/10
-    tmp.sort()
+        tmp[i] = tmp[i]*weighting+biasing+ randint(1, lenght_of_value/5)-lenght_of_value/10
+    # tmp.sort()
 
     with open(os.path.join(os.path.dirname(__file__),"dataset/mathAIH02.txt"), 'a') as f:
         f.write(f'Target values are: {tmp}\n')
+
+    with open(os.path.join(os.path.dirname(__file__),"dataset/mathAIH02.txt"), 'a') as f:
+        f.write(f'Weighting and biassing values are: [{weighting}, {biasing}]\n')
 
 def read_testcase(file, printer = 0):
     with open(os.path.join(os.path.dirname(__file__),file),'r') as f:
@@ -28,13 +32,14 @@ def read_testcase(file, printer = 0):
         if(d_norm > 2): d_norm = np.inf
         main_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
         target_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
-
+        wb = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
+    print(wb)
     if(printer):
         print(f'd_norm in norm is:\n{d_norm}\n')
         print(f'Values are:\n{main_value}\n')
         print(f'Target values are:\n{target_value}\n')
     
-    return d_norm, main_value, target_value
+    return main_value, target_value, d_norm
 
 def read_dataset(file, atr):
     if (type(atr) == int):
@@ -57,7 +62,10 @@ def read_dataset_with_pandas(file, atr= None):
 
 def read_dataset_with_pandas_to_nparray(file, atr= None):
     data = read_dataset_with_pandas(file, atr)[1]
-    return data.to_numpy()
+    data = data.to_numpy()
+    if(data.dtype == 'int'):
+        data = data.astype('float')
+    return data
 
 def dataframe_to_docx_table(header,data,file,doc=None,save=1):
     """

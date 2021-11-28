@@ -1,26 +1,12 @@
+from math import sqrt
 from matplotlib import pyplot as plt
 import numpy as np
 from random import randint
 from random import seed
 import os
 
-from my_io import build_testcase, read_dataset, read_dataset_with_pandas_to_nparray
+from my_io import build_testcase, read_dataset, read_dataset_with_pandas_to_nparray, read_testcase
 from norm import find_error_x_from_y, find_rep_of_vector
-
-number_of_value = 100
-d_norm = 2
-lenght_of_value = 100
-
-# build_testcase(number_of_value,d_norm,lenght_of_value)
-main_value = read_dataset_with_pandas_to_nparray('dataset/Data-Train-mini.csv',0)
-target_value = read_dataset_with_pandas_to_nparray('dataset/Data-Train-mini.csv',-1)
-
-number_of_value = len(main_value)
-end_lenght_of_value, start_lenght_of_value = main_value.max(), main_value.min()
-llenght_of_value = end_lenght_of_value - start_lenght_of_value
-
-biasing = float(0)
-weighting = float(0)
 
 def find_biasing(main_value, target_value, d_norm):
     """
@@ -32,10 +18,46 @@ def find_biasing(main_value, target_value, d_norm):
     deviation = np.subtract(target_value, main_value)
     return find_rep_of_vector(deviation, d_norm)
 
+def ternary_search(main_value, target_value, cost_function, start_point, end_point):
+    while(end_point-start_point > 1e-6):
+        one_third = start_point+(end_point-start_point)*1/3
+        two_third = start_point+(end_point-start_point)*2/3
+        f_one_third = cost_function(main_value*one_third, target_value, d_norm)
+        f_two_third = cost_function(main_value*two_third, target_value, d_norm)
+        if(f_one_third > f_two_third):
+            start_point = one_third
+        elif (f_one_third == f_two_third):
+            start_point = one_third
+            end_point = two_third
+        else:
+            end_point = two_third
+    return float(start_point)
+
+def sweap_line(main_value, target_value, cost_function, sorted_weights):
+    number_of_value = len(main_value)
+    sum_of_values = sum(main_value)
+    weighting_1_error = cost_function(main_value, target_value, d_norm) # weighting = 1
+    sum_befor = 0
+    sum_after = sum_of_values
+    min_error = weighting_1_error
+    weighting_of_min_error = 1
+
+    for i in range(number_of_value):
+        current_value = main_value[sorted_weights[i][0]]
+        current_weighting = sorted_weights[i][1]
+        sum_after -= current_value
+        current_error = abs(weighting_1_error - (current_weighting-1)*(sum_befor-sum_after))
+        if(current_error < min_error):
+            min_error = current_error
+            weighting_of_min_error = current_weighting
+        sum_after += current_value
+    return weighting_of_min_error
+
 def find_weighting(main_value, target_value, d_norm):
     number_of_value = len(main_value)
 
     with np.errstate(divide='ignore', invalid='ignore'):
+        main_value[main_value == 0] = 1e-4
         weights = np.divide(target_value, main_value)
 
     if (d_norm == 0):
@@ -46,149 +68,74 @@ def find_weighting(main_value, target_value, d_norm):
     sorted_weights.sort(key=lambda x: x[1])
 
     if (d_norm == 1):
-        #Using Sweap Line
-        sum_of_values = sum(main_value)
-        initial_error = find_error_x_from_y(main_value, target_value)
-        sum_befor = 0
-        sum_after = sum_of_values
-        min_error = (lenght_of_value**d_norm)*number_of_value
-        weighting_of_min_error = -1
-
-        for i in range(number_of_value):
-            sum_after -= main_value[sorted_weights[i][0]]
-            if(abs(initial_error - (sorted_weights[i][1]-1)*(sum_befor-sum_after)) < min_error):
-                min_error = abs(initial_error - (sorted_weights[i][1]-1)*(sum_befor-sum_after))
-                weighting_of_min_error = sorted_weights[i][1]
-            sum_after += main_value[sorted_weights[i][0]]
-        return weighting_of_min_error
-
+        return sweap_line(main_value, target_value, find_error_x_from_y, sorted_weights)
+    
+    min_weight = sorted_weights[0][1]
+    max_weight = sorted_weights[number_of_value-1][1]
+    
     if (d_norm == 2):
-        #Lets use Ternary Search
-        start_point = sorted_weights[0][1]
-        end_point = sorted_weights[number_of_value-1][1]
-        while(end_point-start_point > 1e-7):
-            main_value_a = start_point+(end_point-start_point)*1/3
-            main_value_b = start_point+(end_point-start_point)*2/3
-            f_main_value_a = find_error_x_from_y(main_value*main_value_a, target_value)
-            f_main_value_b = find_error_x_from_y(main_value*main_value_b, target_value)
-            if(f_main_value_a > f_main_value_b):
-                start_point = main_value_a
-            elif (f_main_value_a == f_main_value_b):
-                start_point = main_value_a
-                end_point = main_value_b
-            else:
-                end_point = main_value_b
-        return float(start_point)
-
+        return ternary_search(main_value, target_value, find_error_x_from_y, min_weight, max_weight)
+    
+    value_of_min_weight = main_value[sorted_weights[0][0]]
+    value_of_max_weight = main_value[sorted_weights[number_of_value-1][0]]
+    
     if (d_norm > 2):
-        return ((sorted_weights[0][1]*main_value[sorted_weights[0][0]]
-            + sorted_weights[number_of_value-1][1]*main_value[sorted_weights[number_of_value-1][0]])
-            / (main_value[sorted_weights[0][0]]+main_value[sorted_weights[number_of_value-1][0]]))
+        return ((min_weight*value_of_min_weight + max_weight*value_of_max_weight)
+            / (value_of_min_weight+value_of_max_weight))
 
-def alternate_search(main_value, target_value, method):
+def alternate_search(main_value, target_value):
+    number_of_value = len(main_value)
 
-    if(method == 'nod_norm'):
-        itr = 0
-        biasing = 0
-        weighting = 1
-        error_biasing = 0
-        next_error = find_error_x_from_y(main_value, target_value)
-        error_biasing = next_error
+    itr = 0
+    biasing = 0
+    weighting = 1
+    best_error = np.inf
+    best_biasing = 0
+    best_weighting = 1
+    cur_error = best_error
+
+    noImp = 0
+    while (noImp < sqrt(number_of_value)):
+        if(best_error - cur_error < 1e-5):
+            noImp += 1
+        else:
+            noImp = 0
+
+        if(cur_error < best_error):
+            best_error = cur_error
+            best_weighting = weighting
+            best_biasing = biasing
 
         if(itr % 2 == 0):
-            biasing = find_biasing(main_value*weighting, target_value)
-            next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
+            weighting *= find_weighting(main_value*weighting+biasing, target_value, d_norm)
+            cur_error = find_error_x_from_y(main_value*weighting+biasing, target_value, d_norm)
 
         else:
-            weighting = find_weighting(main_value+biasing, target_value, d_norm)
-            next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
+            biasing += find_biasing(main_value*weighting+biasing, target_value, d_norm)
+            cur_error = find_error_x_from_y(main_value*weighting+biasing, target_value, d_norm)
 
-        nod_normif = 0
-        while (nod_normif < 100):
-            if(abs(error_biasing - next_error) < 0.00001):
-                nod_normif += 1
-            else:
-                nod_normif = 0
+        itr += 1
+    return best_weighting, best_biasing
 
-            error_biasing = next_error
+# while(1):
+number_of_value = 100
+d_norm = 2
+lenght_of_value = 1000
 
-            if(itr % 2 == 0):
-                biasing = find_biasing(main_value*weighting, target_value)
-                next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-
-            else:
-                weighting = find_weighting(main_value+biasing, target_value, d_norm)
-                next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-            
-            itr += 1
-        return weighting, biasing
-
-    if(method == 'noImp'):
-        itr = 0
-        biasing = 0
-        weighting = 1
-        errBest = (lenght_of_value**d_norm)*number_of_value
-        best_biasing = 0
-        best_weighting = 0
-        next_error = find_error_x_from_y(main_value, target_value)
-
-        if(itr % 2 == 0):
-            biasing = find_biasing(main_value*weighting, target_value)
-            next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-
-        else:
-            weighting = find_weighting(main_value+biasing, target_value, d_norm)
-            next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-
-        noImp = 0
-        while (noImp < 100):
-            if(errBest - next_error < 0.00000001):
-                noImp += 1
-            else:
-                noImp = 0
-
-            if(next_error < errBest):
-                errBest = next_error
-                best_weighting = weighting
-                best_biasing = biasing
-
-            if(itr % 2 == 0):
-                biasing = find_biasing(main_value*weighting, target_value)
-                next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-
-            else:
-                weighting = find_weighting(main_value+biasing, target_value, d_norm)
-                next_error = find_error_x_from_y(main_value*weighting+biasing, target_value)
-            
-            itr += 1
-        return best_weighting, best_biasing
-
-
-print(f'basic error is:\n{find_error_x_from_y(main_value,target_value)}\n')
-weighting, biasing = alternate_search(main_value,target_value,"noImp")
-print(f'final a is {weighting} and c is {biasing} with error {find_error_x_from_y(main_value*weighting+biasing,target_value)}')
-# weighting, biasing = alternate_search(main_value,target_value,"nod_norm")
-# print(f'final a is {weighting} and c is {biasing} with error {find_error_x_from_y(main_value*weighting+biasing,target_value)}')
-
-
-
-
-# rg = np.arange(0,20,0.02)
-# x = np.zeros_like(rg)
-# y = np.zeros((len(rg),len(rg)))
-# for ii,i in enumerate(rg):
-#     for jj,j in enumerate(rg):
-#         x[ii] = i
-#         y[ii][jj]=find_error_x_from_y(main_value*i+j,target_value)
-# xmin = int(np.argmin(y)/len(rg))
-# ymin = int(np.argmin(y)%len(rg))
-# print(f'min error in weights & c is {np.min(y)} in weights = {x[int(np.argmin(y)/len(rg))]} and c = {x[int(np.argmin(y)%len(rg))]}\n')
-# print(find_error_x_from_y(main_value*x[xmin]+x[ymin],target_value))
-# print(min(rg),max(rg))
-
-# ax1.plot(main_value, y, '.')
-# ax1.set_title('With biasing')
-# ax1.set(main_valuelabel='Δ', ylabel='err')
-# y2 = np.zeros(number_of_value)
-# ax1.plot(deviation, y2, 'x')
+build_testcase(number_of_value,d_norm,lenght_of_value)
+# main_value, target_value, d_norm = read_testcase('dataset/mathAIH02.txt',0)
+# plt.plot(main_value,target_value,'.')
 # plt.show()
+main_value = read_dataset_with_pandas_to_nparray('dataset/Data-Train.csv',0)
+target_value = read_dataset_with_pandas_to_nparray('dataset/Data-Train.csv',-1)
+
+number_of_value = len(main_value)
+end_lenght_of_value, start_lenght_of_value = main_value.max(), main_value.min()
+llenght_of_value = end_lenght_of_value - start_lenght_of_value
+
+biasing = float(0)
+weighting = float(0)
+
+print(f'basic error is:\n{find_error_x_from_y(main_value,target_value,d_norm)}\n')
+weighting, biasing = alternate_search(main_value,target_value)
+print(f'final a is {weighting} and c is {biasing} with error {find_error_x_from_y(main_value*weighting+biasing,target_value, d_norm)}')
