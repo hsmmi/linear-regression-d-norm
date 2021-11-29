@@ -33,7 +33,7 @@ def read_testcase(file, printer = 0):
         main_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
         target_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
         wb = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
-    print(wb)
+    print(f'Weighting and biassing values are:\n{wb}\n')
     if(printer):
         print(f'd_norm in norm is:\n{d_norm}\n')
         print(f'Values are:\n{main_value}\n')
@@ -63,6 +63,8 @@ def read_dataset_with_pandas(file, atr= None):
 def read_dataset_with_pandas_to_nparray(file, atr= None):
     data = read_dataset_with_pandas(file, atr)[1]
     data = data.to_numpy()
+    if (type(atr) == int):
+        data = np.array(list(map(lambda x:x[0], data)))
     if(data.dtype == 'int'):
         data = data.astype('float')
     return data
