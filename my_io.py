@@ -30,16 +30,16 @@ def read_testcase(file, printer = 0):
     with open(os.path.join(os.path.dirname(__file__),file),'r') as f:
         d_norm = int(f.readline().split(':')[1])
         if(d_norm > 2): d_norm = np.inf
-        main_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
+        source_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
         target_value = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
         wb = np.array(list(map(float, f.readline().split(':')[1][2:-2].split(', '))))
     print(f'Weighting and biassing values are:\n{wb}\n')
     if(printer):
         print(f'd_norm in norm is:\n{d_norm}\n')
-        print(f'Values are:\n{main_value}\n')
+        print(f'Values are:\n{source_value}\n')
         print(f'Target values are:\n{target_value}\n')
     
-    return main_value, target_value, d_norm
+    return source_value, target_value, d_norm
 
 def read_dataset(file, atr):
     if (type(atr) == int):
